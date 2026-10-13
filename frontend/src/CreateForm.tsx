@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type SubmitEvent } from 'react'
 import { ApiError, createTicket, errorMessage, PRIORITY_LABELS, type FieldErrors, type Priority } from './api'
 
 const FORM_FIELDS = ['title', 'description', 'priority']
@@ -12,7 +12,7 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
   const [banner, setBanner] = useState<string | null>(null)
   const [created, setCreated] = useState(false)
 
-  async function submit(event: FormEvent) {
+  async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     if (submitting) return
     setSubmitting(true)
