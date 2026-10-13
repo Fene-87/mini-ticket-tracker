@@ -1,0 +1,8 @@
+from django.urls import path
+
+from . import views
+
+# No trailing slashes, matching the API spec (and avoiding APPEND_SLASH redirects on POST).
+urlpatterns = [
+    path('tickets', views.TicketListCreateView.as_view(), name='ticket-list'),
+]
