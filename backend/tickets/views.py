@@ -1,5 +1,6 @@
 import math
 
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
@@ -76,3 +77,14 @@ class TicketDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+
+class TicketStatsView(APIView):
+    def get(self, request):
+        # One GROUP BY query; statuses with no tickets are missing from it, so fill them with 0.
+        rows = Ticket.objects.values('status').annotate(count=Count('id'))
+        counts = {row['status']: row['count'] for row in rows}
+        stats = {value: counts.get(value, 0) for value in Status.values}
+        # The CHECK constraint rules out other statuses, so the buckets add up to the total.
+        stats['total'] = sum(stats.values())
+        return Response(stats)
