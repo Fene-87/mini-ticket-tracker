@@ -1,12 +1,13 @@
 import math
 
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Status, Ticket
-from .serializers import TicketSerializer
+from .serializers import TicketSerializer, TicketUpdateSerializer
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
@@ -66,3 +67,12 @@ class TicketListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class TicketDetailView(APIView):
+    def patch(self, request, pk):
+        ticket = get_object_or_404(Ticket, pk=pk)
+        serializer = TicketUpdateSerializer(ticket, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

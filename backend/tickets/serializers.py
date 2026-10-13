@@ -30,3 +30,23 @@ class TicketSerializer(RejectNonWritableFieldsMixin, serializers.ModelSerializer
         model = Ticket
         fields = ['id', 'title', 'description', 'status', 'priority', 'created_at']
         read_only_fields = ['id', 'status', 'created_at']
+
+
+class TicketUpdateSerializer(TicketSerializer):
+    """Patch: only status and priority are writable. Any status-to-status transition is allowed."""
+
+    class Meta(TicketSerializer.Meta):
+        read_only_fields = ['id', 'title', 'description', 'created_at']
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError('Provide at least one of: status, priority.')
+        return attrs
+
+    def update(self, instance, validated_data):
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        # Write only the changed columns, so concurrent PATCHes to different fields
+        # (one sets priority, another sets status) don't overwrite each other.
+        instance.save(update_fields=list(validated_data))
+        return instance
