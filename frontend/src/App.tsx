@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import CreateForm from './CreateForm'
-import { errorMessage, getStats, listTickets, STATUS_LABELS, type Stats, type Status, type TicketPage } from './api'
+import { errorMessage, getStats, listTickets, type Stats, type Status, type TicketPage } from './api'
 import Pager from './Pager'
-import StatsBar from './StatsBar'
+import StatusTabs from './StatusTabs'
 import TicketTable from './TicketTable'
 
 function App() {
@@ -15,6 +15,8 @@ function App() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [statsError, setStatsError] = useState<string | null>(null)
   const [version, setVersion] = useState(0) // bumped after a create or status change to refetch list + stats
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createdNotice, setCreatedNotice] = useState(0) // bumped per create; 0 hides "Ticket created"
 
   const requestKey = `${statusFilter}|${page}|${version}`
   const loading = settled?.key !== requestKey
@@ -55,6 +57,13 @@ function App() {
     }
   }, [version])
 
+  useEffect(() => {
+    if (createdNotice === 0) return
+    // Each create bumps the counter, so cleanup cancels the previous timer and the 5 s restarts.
+    const timer = setTimeout(() => setCreatedNotice(0), 5000)
+    return () => clearTimeout(timer)
+  }, [createdNotice])
+
   function changeFilter(value: Status | '') {
     setStatusFilter(value)
     setPage(1)
@@ -65,50 +74,67 @@ function App() {
   }
 
   function handleCreated() {
+    setCreateOpen(false)
+    setCreatedNotice((n) => n + 1)
     setPage(1) // newest first, so the new ticket lands on page 1 (if it matches the filter)
     refresh()
   }
 
+  const first = ticketPage ? (ticketPage.page - 1) * ticketPage.limit + 1 : 0
+  const last = ticketPage ? first + ticketPage.results.length - 1 : 0
+
   return (
-    <main>
-      <h1>Mini Ticket Tracker</h1>
-      <StatsBar stats={stats} error={statsError} />
-      <CreateForm onCreated={handleCreated} />
-
-      <label className="filter">
-        Status{' '}
-        <select value={statusFilter} onChange={(e) => changeFilter(e.target.value as Status | '')}>
-          <option value="">All</option>
-          {(Object.keys(STATUS_LABELS) as Status[]).map((status) => (
-            <option key={status} value={status}>
-              {STATUS_LABELS[status]}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {listError ? (
-        <p className="error" role="alert">
-          Could not load tickets: {listError}
-        </p>
-      ) : !ticketPage ? (
-        <p className="muted">Loading tickets…</p>
-      ) : (
-        <>
-          {/* Keep the previous rows on screen while the next page loads, to avoid flicker. */}
-          <div className={loading ? 'loading' : undefined} aria-busy={loading}>
-            <TicketTable tickets={ticketPage.results} onStatusSaved={refresh} />
+    <>
+      <header className="appbar">
+        <div className="appbar-inner">
+          <h1>Mini Ticket Tracker</h1>
+          <div className="appbar-actions">
+            <span className="notice" role="status">
+              {createdNotice > 0 && 'Ticket created'}
+            </span>
+            <button type="button" className="primary" onClick={() => setCreateOpen((open) => !open)}>
+              New ticket
+            </button>
           </div>
-          <Pager
-            page={page}
-            totalPages={ticketPage.total_pages}
-            total={ticketPage.total}
-            disabled={loading}
-            onChange={setPage}
-          />
-        </>
-      )}
-    </main>
+        </div>
+      </header>
+
+      <main className="content">
+        {statsError && (
+          <p className="banner banner-error" role="alert">
+            Counts unavailable: {statsError}
+          </p>
+        )}
+        <section className="panel">
+          <StatusTabs stats={stats} active={statusFilter} onChange={changeFilter} />
+          {createOpen && <CreateForm onCreated={handleCreated} onCancel={() => setCreateOpen(false)} />}
+
+          {listError ? (
+            <p className="banner banner-error" role="alert">
+              Could not load tickets: {listError}
+            </p>
+          ) : !ticketPage ? (
+            <p className="empty">Loading tickets…</p>
+          ) : (
+            <>
+              {/* Keep the previous rows on screen while the next page loads, to avoid flicker. */}
+              <div className={loading ? 'loading' : undefined} aria-busy={loading}>
+                <TicketTable tickets={ticketPage.results} onStatusSaved={refresh} />
+              </div>
+              <Pager
+                page={page}
+                totalPages={ticketPage.total_pages}
+                first={first}
+                last={last}
+                total={ticketPage.total}
+                disabled={loading}
+                onChange={setPage}
+              />
+            </>
+          )}
+        </section>
+      </main>
+    </>
   )
 }
 
