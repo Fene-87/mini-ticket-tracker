@@ -66,3 +66,26 @@ td {
   gap: 12px;
   margin-top: 12px;
 }
+
+.success {
+  color: #2e7d32;
+  margin-left: 12px;
+}
+
+.create {
+  margin-bottom: 24px;
+}
+
+.create fieldset {
+  display: grid;
+  gap: 8px;
+  max-width: 480px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.create label {
+  display: grid;
+  gap: 2px;
+}

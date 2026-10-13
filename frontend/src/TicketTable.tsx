@@ -1,6 +1,12 @@
-import { PRIORITY_LABELS, STATUS_LABELS, type Ticket } from './api'
+import { useState } from 'react'
+import { errorMessage, PRIORITY_LABELS, STATUS_LABELS, updateTicket, type Status, type Ticket } from './api'
 
-function TicketTable({ tickets }: { tickets: Ticket[] }) {
+interface Props {
+  tickets: Ticket[]
+  onStatusSaved: () => void
+}
+
+function TicketTable({ tickets, onStatusSaved }: Props) {
   if (tickets.length === 0) return <p className="muted">No tickets</p>
 
   return (
@@ -17,7 +23,10 @@ function TicketTable({ tickets }: { tickets: Ticket[] }) {
         {tickets.map((ticket) => (
           <tr key={ticket.id}>
             <td>{ticket.title}</td>
-            <td>{STATUS_LABELS[ticket.status]}</td>
+            <td>
+              {/* Keyed on the server's status, so the select's local state resets when the refetched row arrives. */}
+              <StatusSelect key={`${ticket.id}-${ticket.status}`} ticket={ticket} onSaved={onStatusSaved} />
+            </td>
             <td>{PRIORITY_LABELS[ticket.priority]}</td>
             {/* created_at is UTC from the API; toLocaleString shows it in the viewer's time zone. */}
             <td>{new Date(ticket.created_at).toLocaleString()}</td>
@@ -25,6 +34,45 @@ function TicketTable({ tickets }: { tickets: Ticket[] }) {
         ))}
       </tbody>
     </table>
+  )
+}
+
+function StatusSelect({ ticket, onSaved }: { ticket: Ticket; onSaved: () => void }) {
+  const [pending, setPending] = useState<Status | null>(null) // chosen status until the refetch confirms it
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function change(status: Status) {
+    setPending(status)
+    setSaving(true)
+    setError(null)
+    try {
+      await updateTicket(ticket.id, { status })
+      onSaved()
+    } catch (e) {
+      setPending(null) // the change didn't save, so show the server's value again
+      setError(errorMessage(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <select
+        aria-label={`Status of ${ticket.title}`}
+        value={pending ?? ticket.status}
+        disabled={saving}
+        onChange={(e) => change(e.target.value as Status)}
+      >
+        {(Object.keys(STATUS_LABELS) as Status[]).map((status) => (
+          <option key={status} value={status}>
+            {STATUS_LABELS[status]}
+          </option>
+        ))}
+      </select>
+      {error && <span className="error"> {error}</span>}
+    </>
   )
 }
 

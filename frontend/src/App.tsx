@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import CreateForm from './CreateForm'
 import { errorMessage, getStats, listTickets, STATUS_LABELS, type Stats, type Status, type TicketPage } from './api'
 import Pager from './Pager'
 import StatsBar from './StatsBar'
@@ -13,8 +14,9 @@ function App() {
   const [settled, setSettled] = useState<{ key: string; error: string | null } | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   const [statsError, setStatsError] = useState<string | null>(null)
+  const [version, setVersion] = useState(0) // bumped after a create or status change to refetch list + stats
 
-  const requestKey = `${statusFilter}|${page}`
+  const requestKey = `${statusFilter}|${page}|${version}`
   const loading = settled?.key !== requestKey
   const listError = loading ? null : settled.error
 
@@ -25,6 +27,11 @@ function App() {
     listTickets({ status: statusFilter || undefined, page })
       .then((data) => {
         if (ignore) return
+        // A status change under a filter can empty the last page; step back to the new last page.
+        if (data.results.length === 0 && page > 1) {
+          setPage(Math.max(1, data.total_pages))
+          return
+        }
         setTicketPage(data)
         setSettled({ key: requestKey, error: null })
       })
@@ -37,22 +44,36 @@ function App() {
   useEffect(() => {
     let ignore = false
     getStats()
-      .then((data) => !ignore && setStats(data))
+      .then((data) => {
+        if (ignore) return
+        setStats(data)
+        setStatsError(null)
+      })
       .catch((e: unknown) => !ignore && setStatsError(errorMessage(e)))
     return () => {
       ignore = true
     }
-  }, [])
+  }, [version])
 
   function changeFilter(value: Status | '') {
     setStatusFilter(value)
     setPage(1)
   }
 
+  function refresh() {
+    setVersion((v) => v + 1)
+  }
+
+  function handleCreated() {
+    setPage(1) // newest first, so the new ticket lands on page 1 (if it matches the filter)
+    refresh()
+  }
+
   return (
     <main>
       <h1>Mini Ticket Tracker</h1>
       <StatsBar stats={stats} error={statsError} />
+      <CreateForm onCreated={handleCreated} />
 
       <label className="filter">
         Status{' '}
@@ -76,7 +97,7 @@ function App() {
         <>
           {/* Keep the previous rows on screen while the next page loads, to avoid flicker. */}
           <div className={loading ? 'loading' : undefined} aria-busy={loading}>
-            <TicketTable tickets={ticketPage.results} />
+            <TicketTable tickets={ticketPage.results} onStatusSaved={refresh} />
           </div>
           <Pager
             page={page}
