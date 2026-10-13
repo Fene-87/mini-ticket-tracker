@@ -4,6 +4,13 @@
 export type Status = 'open' | 'in_progress' | 'closed'
 export type Priority = 'low' | 'medium' | 'high'
 
+export const STATUS_LABELS: Record<Status, string> = {
+  open: 'Open',
+  in_progress: 'In progress',
+  closed: 'Closed',
+}
+export const PRIORITY_LABELS: Record<Priority, string> = { low: 'Low', medium: 'Medium', high: 'High' }
+
 export interface Ticket {
   id: number
   title: string
@@ -51,6 +58,12 @@ export class ApiError extends Error {
     this.status = status
     this.fieldErrors = fieldErrors
   }
+}
+
+/** A user-facing message for anything the wrappers throw: an ApiError, or fetch's own network failure. */
+export function errorMessage(error: unknown): string {
+  if (error instanceof ApiError) return error.message
+  return `Could not reach the server${error instanceof Error ? ` (${error.message})` : ''}.`
 }
 
 function toApiError(status: number, body: unknown): ApiError {
